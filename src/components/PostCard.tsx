@@ -3,7 +3,7 @@ import { ArrowUpRight, Download, Eye, FileText, Image, Music, Video } from 'luci
 import type { Post } from '../lib/supabase';
 
 const icons = { pdf: FileText, image: Image, video: Video, audio: Music, text: FileText, other: FileText };
-const size = (n: number) => n ? n < 1048576 ? `${Math.round(n / 1024)} Ko` : `${(n / 1048576).toFixed(1)} Mo` : '';
+const size = (n: number | null) => n ? n < 1048576 ? `${Math.round(n / 1024)} Ko` : `${(n / 1048576).toFixed(1)} Mo` : '';
 export function PostCard({ post }: { post: Post }) {
   const Icon = icons[post.type] || FileText;
   return <Link to={`/contenu/${post.id}`} className="post-card group min-w-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] transition duration-200 hover:-translate-y-1 hover:shadow-xl">

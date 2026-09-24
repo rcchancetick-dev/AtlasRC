@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, Calendar, Download, Eye, FileDown, Tag } from 'lucide-react';
 import { supabase, type Post } from '../lib/supabase';
@@ -13,9 +13,12 @@ export function ContentDetail({ posts, loading }: { posts: Post[]; loading: bool
   const [post, setPost] = useState<Post | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const [views, setViews] = useState<number | null>(null);
+  const counted = useRef<string | null>(null);
   useEffect(() => {
     let active = true;
     const local = posts.find(p => p.id === id);
+    setViews(null);
     if (local) { setPost(local); setBusy(false); } else { setBusy(true); setPost(null); }
     if (!id) { setBusy(false); return () => { active = false; }; }
     void supabase.from('posts').select('*').eq('id', id).single().then(({ data, error: fetchError }) => {
@@ -26,7 +29,19 @@ export function ContentDetail({ posts, loading }: { posts: Post[]; loading: bool
     });
     return () => { active = false; };
   }, [id]);
-  useEffect(() => { if (post?.id) void supabase.rpc('increment_views', { post_id: post.id }); }, [post?.id]);
+  useEffect(() => {
+    if (!post?.id || post.id !== id || counted.current === id) return;
+    counted.current = id;
+    let active = true;
+    void (async () => {
+      const { error: rpcError } = await supabase.rpc('increment_views', { post_id: id });
+      if (rpcError) { console.error('Impossible de compter cette consultation', rpcError); return; }
+      const { data, error: readError } = await supabase.from('posts').select('views').eq('id', id).single();
+      if (readError) console.error('Impossible de lire les consultations', readError);
+      else if (active && typeof data?.views === 'number') setViews(data.views);
+    })();
+    return () => { active = false; };
+  }, [post?.id, id]);
   const related = post ? posts.filter(p => p.id !== post.id && p.category === post.category).slice(0, 3) : [];
   if (busy || (loading && !post)) return <section className="container min-h-[65vh] py-10 sm:py-16"><div className="mb-8 h-5 w-32 animate-pulse rounded bg-[var(--muted)]"/><div className="h-96 animate-pulse rounded-2xl bg-[var(--muted)]"/></section>;
   if (!post) return <section className="container min-h-[65vh] py-12"><Link to="/bibliotheque" className="text-indigo-600">← Retour à la bibliothèque</Link><h1 className="mt-10 text-3xl font-bold">Fichier introuvable</h1>{error && <p role="alert" className="mt-4 break-words text-[var(--soft)]">{error}</p>}</section>;
@@ -38,7 +53,7 @@ export function ContentDetail({ posts, loading }: { posts: Post[]; loading: bool
         <div className="mb-5 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-indigo-600"><span className="rounded-full bg-indigo-50 px-3 py-1.5 dark:bg-indigo-950">{post.category}</span><span className="rounded-full bg-[var(--muted)] px-3 py-1.5 uppercase">{post.type}</span></div>
         <h1 className="break-words text-3xl font-extrabold leading-tight tracking-tight [overflow-wrap:anywhere] sm:text-4xl lg:text-5xl">{post.title}</h1>
         {post.description && <p className="mt-5 whitespace-pre-line break-words leading-relaxed text-[var(--soft)] [overflow-wrap:anywhere]">{post.description}</p>}
-        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm text-[var(--soft)]"><span className="inline-flex items-center gap-2"><Calendar size={16}/>{new Date(post.created_at).toLocaleDateString('fr-FR')}</span><span className="inline-flex items-center gap-2"><Eye size={16}/>{post.views} vues</span><span className="inline-flex items-center gap-2"><Download size={16}/>{post.downloads} téléchargements</span></div>
+        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm text-[var(--soft)]"><span className="inline-flex items-center gap-2"><Calendar size={16}/>{new Date(post.created_at).toLocaleDateString('fr-FR')}</span><span className="inline-flex items-center gap-2"><Eye size={16}/>{views ?? post.views} vues</span><span className="inline-flex items-center gap-2"><Download size={16}/>{post.downloads} téléchargements</span></div>
         {post.tags?.length > 0 && <div className="mt-5 flex flex-wrap items-center gap-2"><Tag size={16} className="shrink-0 text-[var(--soft)]"/>{post.tags.map(tag => <span key={tag} className="max-w-full break-words rounded-full bg-[var(--muted)] px-3 py-1 text-xs [overflow-wrap:anywhere]">{tag}</span>)}</div>}
         <div className="mt-8 min-w-0"><h2 className="mb-4 text-xl font-bold">Aperçu du fichier</h2><FilePreview post={post}/></div>
       </div>

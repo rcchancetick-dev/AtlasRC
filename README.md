@@ -1,6 +1,8 @@
 # AtlasRC — guide simple
 
-Le site montre les nouvelles publications de la chaîne [@AtlasRC_canal](https://t.me/AtlasRC_canal). Il faut relier **3 choses** : Telegram (où tu publies), Supabase (qui garde les fichiers et les informations) et le site (que les visiteurs consultent).
+Le site affiche uniquement les publications **avec fichier** de la chaîne [@AtlasRC_canal](https://t.me/AtlasRC_canal) : documents (PDF, Word, ZIP…), images, vidéos et audios. Une légende sert de titre/description, mais un message texte seul n'apparaît pas sur le site. Les visiteurs peuvent ouvrir la fiche ou télécharger directement le fichier. Les anciens messages texte restent enregistrés dans Supabase, mais sont masqués sur le site.
+
+Il faut relier **3 choses** : Telegram (où tu publies), Supabase (qui garde les fichiers et les informations) et le site (que les visiteurs consultent).
 
 > **Important :** le code présent sur GitHub n'est pas encore un site en ligne. Le simple lien de la chaîne ne synchronise rien : il faut configurer un **bot Telegram** et son **webhook**. Un webhook est simplement une adresse à laquelle Telegram envoie les nouveaux messages. Ne m'envoie jamais ton token de bot, ton secret de webhook, ni la clé secrète Supabase.
 
@@ -8,7 +10,7 @@ Le site montre les nouvelles publications de la chaîne [@AtlasRC_canal](https:/
 
 1. Crée un projet sur [Supabase](https://supabase.com/dashboard). Note son **Project ref** (identifiant du projet, visible dans son adresse). Tu l'utiliseras à la place de `PROJECT_REF` dans les commandes ci-dessous.
 2. Dans le dépôt GitHub, ouvre [`supabase/migrations/20260924000000_init.sql`](supabase/migrations/20260924000000_init.sql), copie tout le contenu. Dans Supabase, ouvre **SQL Editor → New query**, colle le texte et clique sur **Run**. Cela crée la table `posts`, l'espace public `content` pour les fichiers et la mise à jour en direct.
-3. Dans Supabase, ouvre **Project Settings → API Keys** (ou **Connect**). Récupère l'**URL du projet** et la **clé publique / publishable**. Garde-les pour l'étape 4. N'utilise pas la clé secrète dans le site.
+3. Dans Supabase, ouvre **Project Settings → API Keys** (ou **Connect**). Récupère l'**URL du projet** et la **clé publique / publishable**. Garde-les pour l'étape 5. N'utilise pas la clé secrète dans le site.
 
 ## 2. Créer le bot Telegram
 
@@ -80,7 +82,9 @@ Une réponse avec `"ok":true` signifie que Telegram a enregistré l'adresse. Pou
 curl -sS "https://api.telegram.org/bot${TELEGRAM_CHANNEL_TOKEN}/getWebhookInfo"
 ```
 
-Contrôle `result.url` et, si besoin, `result.last_error_message`. **Ne partage pas ces sorties brutes** si elles comportent des données sensibles. Publie un nouveau petit message de test dans la chaîne, puis regarde **Table Editor → posts** dans Supabase : une nouvelle ligne doit apparaître. Si oui, la connexion Telegram → Supabase fonctionne.
+Contrôle `result.url` et, si besoin, `result.last_error_message`. **Ne partage pas ces sorties brutes** si elles comportent des données sensibles. Publie un nouveau petit fichier de test dans la chaîne, puis regarde **Table Editor → posts** dans Supabase : une nouvelle ligne doit apparaître. Si oui, la connexion Telegram → Supabase fonctionne.
+
+> Si tu as déployé la fonction depuis le Dashboard sous un autre nom (par exemple `bright-handler`), le webhook doit pointer vers l'**URL exacte affichée dans Supabase**, et non obligatoirement vers `/telegram-webhook`. Modifier GitHub ne redéploie pas cette fonction Dashboard : copie le nouveau code depuis [`supabase/functions/telegram-webhook/index.ts`](supabase/functions/telegram-webhook/index.ts) dans **Edge Functions → bright-handler → Code**, puis clique **Deploy updates**. Ne change ni les secrets ni l'URL du webhook si `bright-handler` reste son nom.
 
 ## 5. Mettre le site en ligne
 

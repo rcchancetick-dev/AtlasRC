@@ -1,20 +1,49 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDownToLine, Check, ChevronLeft, Share2 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { PostCard } from '../components/PostCard';
+import { ArrowLeft, ArrowUpRight, Calendar, Download, Eye, FileDown, Tag } from 'lucide-react';
+import { supabase, type Post } from '../lib/supabase';
 import { FilePreview } from '../components/FilePreview';
-import { supabase, type Post, size, date } from '../lib/supabase';
+import { PostCard } from '../components/PostCard';
+import { Button } from '../components/ui/button';
 
-function downloadUrl(fileUrl: string) { const url = new URL(fileUrl); url.searchParams.set('download',''); return url.toString(); }
+const formatSize = (bytes: number) => bytes ? bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} Ko` : `${(bytes / 1024 / 1024).toFixed(1)} Mo` : '—';
 
-export function ContentDetail({posts,loading}:{posts:Post[];loading:boolean}) {
-  const {id}=useParams();
-  const post=posts.find(p=>p.id===id);
-  const [copied,setCopied]=useState(false);
-  useEffect(()=>{if(!post)return;document.title=post.title+' — AtlasRC';document.querySelector('meta[name="description"]')?.setAttribute('content',post.description||post.title);void supabase.rpc('increment_post_counter',{post_id:post.id,counter:'views'});return()=>{document.title='AtlasRC — La bibliothèque qui avance avec vous'}},[post?.id]);
-  if(loading)return <div className="container py-20"><div className="h-88 animate-pulse rounded-2xl bg-[var(--muted)]"/></div>;
-  if(!post)return <div className="container flex min-h-[65vh] flex-col items-center justify-center text-center"><h1 className="text-3xl font-extrabold">Fichier introuvable</h1><p className="mt-3 text-[var(--soft)]">Ce fichier n'est plus disponible.</p><Button asChild className="mt-8"><Link to="/bibliotheque">Retour à la bibliothèque</Link></Button></div>;
-  const download=()=>{void supabase.rpc('increment_post_counter',{post_id:post.id,counter:'downloads'})};
-  return <div className="container py-12"><Link className="inline-flex items-center gap-2 text-sm text-[var(--soft)] hover:text-indigo-600" to="/bibliotheque"><ChevronLeft size={18}/> Retour à la bibliothèque</Link><div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_310px]"><div><div className="flex flex-wrap gap-2"><span className="rounded-lg bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{post.category}</span>{post.tags.map(t=><span key={t} className="rounded-lg bg-[var(--muted)] px-3 py-1 text-xs">#{t}</span>)}</div><h1 className="mt-5 break-words text-3xl font-extrabold sm:text-5xl">{post.title}</h1><p className="mt-5 whitespace-pre-wrap text-[var(--soft)]">{post.description}</p><FilePreview post={post}/></div><aside className="h-fit rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:sticky lg:top-25"><h2 className="mb-5 text-lg font-bold">À propos de la ressource</h2><dl className="space-y-4 text-sm">{[['Format',post.type.toUpperCase()],['Taille',size(post.file_size)],['Publié le',date(post.created_at)],['Consultations',String(post.views)],['Téléchargements',String(post.downloads)]].map(([k,v])=><div key={k} className="flex justify-between gap-3"><dt className="text-[var(--soft)]">{k}</dt><dd className="text-right font-semibold">{v}</dd></div>)}</dl><div className="mt-7 space-y-3">{post.file_url&&<Button asChild className="w-full"><a href={downloadUrl(post.file_url)} download target="_blank" rel="noreferrer" onClick={download}><ArrowDownToLine size={18}/> Télécharger</a></Button>}<Button variant="outline" className="w-full" onClick={async()=>{await navigator.clipboard.writeText(location.href);setCopied(true);setTimeout(()=>setCopied(false),2000)}}>{copied?<Check size={18}/>:<Share2 size={18}/>} {copied?'Lien copié':'Partager'}</Button></div></aside></div><section className="mt-22"><h2 className="mb-7 text-2xl font-extrabold">À découvrir aussi</h2><div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{posts.filter(p=>p.id!==post.id&&p.category===post.category).slice(0,3).map(p=><PostCard key={p.id} post={p}/>)}</div></section></div>;
+export function ContentDetail({ posts, loading }: { posts: Post[]; loading: boolean }) {
+  const { id } = useParams();
+  const [post, setPost] = useState<Post | null>(null);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    const local = posts.find(p => p.id === id);
+    if (local) { setPost(local); setBusy(false); } else { setBusy(true); setPost(null); }
+    if (!id) { setBusy(false); return () => { active = false; }; }
+    void supabase.from('posts').select('*').eq('id', id).single().then(({ data, error: fetchError }) => {
+      if (!active) return;
+      setPost((data as Post | null) ?? local ?? null);
+      setError(fetchError && !local ? fetchError.message : '');
+      setBusy(false);
+    });
+    return () => { active = false; };
+  }, [id]);
+  useEffect(() => { if (post?.id) void supabase.rpc('increment_views', { post_id: post.id }); }, [post?.id]);
+  const related = post ? posts.filter(p => p.id !== post.id && p.category === post.category).slice(0, 3) : [];
+  if (busy || (loading && !post)) return <section className="container min-h-[65vh] py-10 sm:py-16"><div className="mb-8 h-5 w-32 animate-pulse rounded bg-[var(--muted)]"/><div className="h-96 animate-pulse rounded-2xl bg-[var(--muted)]"/></section>;
+  if (!post) return <section className="container min-h-[65vh] py-12"><Link to="/bibliotheque" className="text-indigo-600">← Retour à la bibliothèque</Link><h1 className="mt-10 text-3xl font-bold">Fichier introuvable</h1>{error && <p role="alert" className="mt-4 break-words text-[var(--soft)]">{error}</p>}</section>;
+  const download = () => { void supabase.rpc('increment_downloads', { post_id: post.id }); };
+  return <article className="container min-w-0 py-7 sm:py-12 lg:py-16">
+    <Link to="/bibliotheque" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-indigo-600 sm:mb-9"><ArrowLeft size={17}/> Retour à la bibliothèque</Link>
+    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:items-start lg:gap-10">
+      <div className="min-w-0">
+        <div className="mb-5 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-indigo-600"><span className="rounded-full bg-indigo-50 px-3 py-1.5 dark:bg-indigo-950">{post.category}</span><span className="rounded-full bg-[var(--muted)] px-3 py-1.5 uppercase">{post.type}</span></div>
+        <h1 className="break-words text-3xl font-extrabold leading-tight tracking-tight [overflow-wrap:anywhere] sm:text-4xl lg:text-5xl">{post.title}</h1>
+        {post.description && <p className="mt-5 whitespace-pre-line break-words leading-relaxed text-[var(--soft)] [overflow-wrap:anywhere]">{post.description}</p>}
+        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm text-[var(--soft)]"><span className="inline-flex items-center gap-2"><Calendar size={16}/>{new Date(post.created_at).toLocaleDateString('fr-FR')}</span><span className="inline-flex items-center gap-2"><Eye size={16}/>{post.views} vues</span><span className="inline-flex items-center gap-2"><Download size={16}/>{post.downloads} téléchargements</span></div>
+        {post.tags?.length > 0 && <div className="mt-5 flex flex-wrap items-center gap-2"><Tag size={16} className="shrink-0 text-[var(--soft)]"/>{post.tags.map(tag => <span key={tag} className="max-w-full break-words rounded-full bg-[var(--muted)] px-3 py-1 text-xs [overflow-wrap:anywhere]">{tag}</span>)}</div>}
+        <div className="mt-8 min-w-0"><h2 className="mb-4 text-xl font-bold">Aperçu du fichier</h2><FilePreview post={post}/></div>
+      </div>
+      <aside className="min-w-0 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm sm:p-6 lg:sticky lg:top-24"><h2 className="text-lg font-bold">Votre fichier</h2><p className="mt-2 break-words text-sm text-[var(--soft)] [overflow-wrap:anywhere]">{post.title}</p><div className="mt-5 flex justify-between gap-4 border-y border-[var(--line)] py-4 text-sm"><span className="text-[var(--soft)]">Taille</span><span className="shrink-0 font-semibold">{formatSize(post.file_size)}</span></div><div className="mt-5 grid gap-3"><Button asChild className="min-h-11 w-full whitespace-normal text-center"><a href={post.file_url} download onClick={download}><FileDown className="shrink-0" size={18}/> Télécharger</a></Button><Button asChild variant="outline" className="min-h-11 w-full whitespace-normal text-center"><a href={post.file_url} target="_blank" rel="noopener noreferrer">Ouvrir le fichier <ArrowUpRight className="shrink-0" size={17}/></a></Button></div><p className="mt-4 text-xs leading-relaxed text-[var(--soft)]">Si l’aperçu n’est pas disponible sur votre appareil, ouvrez ou téléchargez le fichier.</p></aside>
+    </div>
+    {related.length > 0 && <section className="mt-14 min-w-0 sm:mt-20"><h2 className="mb-6 text-2xl font-extrabold">À découvrir aussi</h2><div className="grid min-w-0 gap-5 sm:grid-cols-2 lg:grid-cols-3">{related.map(item => <PostCard key={item.id} post={item}/>)}</div></section>}
+  </article>;
 }

@@ -1,14 +1,14 @@
-import { FileText, Headphones, ZoomIn } from 'lucide-react';
-import { useState } from 'react';
 import type { Post } from '../lib/supabase';
 import { TextFileViewer } from './TextFileViewer';
 
-const isTxt = (post: Post) => post.type === 'other' && Boolean(post.file_url) && (/\.txt(?:$|[?#])/i.test(post.file_url || '') || /^text\/plain(?:;|$)/i.test(post.mime_type || ''));
-
-export function FilePreview({post}: {post: Post}) {
-  const [zoom,setZoom] = useState(false);
-  const url=post.file_url;
-  return <><div className="mt-9 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]"><div className="flex min-h-70 items-center justify-center bg-[var(--muted)]">
-    {isTxt(post)&&url?<TextFileViewer fileUrl={url} title={post.title}/>:post.type==='pdf'&&url?<iframe title={'PDF : '+post.title} src={url+'#toolbar=1'} className="h-[70vh] w-full"/>:post.type==='video'&&url?<video src={url} controls preload="metadata" className="max-h-[70vh] w-full"/>:post.type==='audio'&&url?<div className="w-full p-8 text-center"><Headphones className="mx-auto mb-5 text-indigo-500" size={60}/><audio src={url} controls preload="metadata" className="w-full" aria-label={post.title}/></div>:post.type==='image'&&url?<button onClick={()=>setZoom(true)} aria-label="Agrandir l'image" className="relative"><img src={url} alt={post.title} className="max-h-[75vh] w-full object-contain"/><ZoomIn className="absolute bottom-4 right-4 rounded-lg bg-white p-1 text-slate-900" size={30}/></button>:<div className="p-8 text-center"><FileText size={70} className="mx-auto text-indigo-400"/><p className="mt-4 text-sm text-[var(--soft)]">Aperçu non disponible pour ce format. Vous pouvez télécharger le fichier.</p></div>}
-  </div></div>{zoom&&url&&<div className="fixed inset-0 z-50 grid place-items-center bg-black/90 p-6" onClick={()=>setZoom(false)} role="dialog" aria-modal="true" aria-label="Image agrandie"><button className="absolute right-5 top-5 text-white" aria-label="Fermer" onClick={()=>setZoom(false)}>Fermer</button><img className="max-h-full max-w-full object-contain" src={url} alt={post.title}/></div>}</>;
+export function FilePreview({ post }: { post: Post }) {
+  const url = post.file_url;
+  if (!url) return <p className="rounded-xl bg-[var(--muted)] p-5 text-sm">Aucun aperçu disponible.</p>;
+  const type = post.type?.toLowerCase();
+  if (type === 'image') return <div className="file-preview flex min-w-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--muted)]"><img src={url} alt={post.title} loading="lazy" className="block max-h-[70dvh] max-w-full object-contain"/></div>;
+  if (type === 'video') return <div className="file-preview min-w-0 overflow-hidden rounded-2xl bg-black"><video controls preload="metadata" playsInline className="block aspect-video h-auto w-full max-w-full" src={url}>Votre navigateur ne prend pas en charge cette vidéo.</video></div>;
+  if (type === 'audio') return <div className="file-preview min-w-0 rounded-2xl bg-[var(--muted)] p-3 sm:p-6"><audio controls preload="none" className="block w-full max-w-full" src={url}>Votre navigateur ne prend pas en charge ce fichier audio.</audio></div>;
+  if (type === 'pdf' || post.mime_type === 'application/pdf') return <div className="file-preview min-w-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]"><iframe title={`Aperçu de ${post.title}`} src={url} loading="lazy" className="block h-[60dvh] min-h-[320px] w-full max-w-full sm:h-[72dvh]"/><p className="border-t border-[var(--line)] px-4 py-3 text-xs text-[var(--soft)]">L’aperçu PDF dépend du navigateur. Le bouton « Ouvrir le fichier » reste disponible.</p></div>;
+  if (type === 'text' || post.mime_type?.startsWith('text/')) return <div className="file-preview min-w-0"><TextFileViewer url={url}/></div>;
+  return <div className="file-preview min-w-0 break-words rounded-2xl bg-[var(--muted)] p-5 text-sm [overflow-wrap:anywhere]">Aperçu indisponible pour ce format. Utilisez « Ouvrir le fichier » ou « Télécharger ».</div>;
 }

@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowUpRight, Calendar, Download, Eye, FileDown, Loader2, Ta
 import { supabase, type Post } from '../lib/supabase';
 import { FilePreview } from '../components/FilePreview';
 import { PostCard } from '../components/PostCard';
+import { ExpandableText } from '../components/ExpandableText';
 import { Button } from '../components/ui/button';
 
 const formatSize = (bytes: number | null) => bytes ? bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} Ko` : `${(bytes / 1024 / 1024).toFixed(1)} Mo` : '—';
@@ -85,7 +86,7 @@ export function ContentDetail({ posts, loading }: { posts: Post[]; loading: bool
       <div className="min-w-0">
         <div className="mb-5 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-indigo-600"><span className="rounded-full bg-indigo-50 px-3 py-1.5 dark:bg-indigo-950">{post.category}</span><span className="rounded-full bg-[var(--muted)] px-3 py-1.5 uppercase">{post.type}</span></div>
         <h1 className="break-words text-3xl font-extrabold leading-tight tracking-tight [overflow-wrap:anywhere] sm:text-4xl lg:text-5xl">{post.title}</h1>
-        {post.description && <p className="mt-5 whitespace-pre-line break-words leading-relaxed text-[var(--soft)] [overflow-wrap:anywhere]">{post.description}</p>}
+        {post.description && <ExpandableText text={post.description} className="mt-5"/>}
         <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm text-[var(--soft)]"><span className="inline-flex items-center gap-2"><Calendar size={16}/>{new Date(post.created_at).toLocaleDateString('fr-FR')}</span><span className="inline-flex items-center gap-2"><Eye size={16}/>{views ?? post.views} vues</span><span className="inline-flex items-center gap-2"><Download size={16}/>{downloads ?? post.downloads} téléchargements</span></div>
         {post.tags?.length > 0 && <div className="mt-5 flex flex-wrap items-center gap-2"><Tag size={16} className="shrink-0 text-[var(--soft)]"/>{post.tags.map(tag => <span key={tag} className="max-w-full break-words rounded-full bg-[var(--muted)] px-3 py-1 text-xs [overflow-wrap:anywhere]">{tag}</span>)}</div>}
         <div className="mt-8 min-w-0"><h2 className="mb-4 text-xl font-bold">Aperçu du fichier</h2><FilePreview post={post}/></div>
